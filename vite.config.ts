@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.svg'],
       manifest: {
         name: 'Lifemarks',
         short_name: 'Lifemarks',
@@ -17,7 +17,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait-primary',
         icons: [
-          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],
       },
     }),
