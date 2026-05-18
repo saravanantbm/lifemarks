@@ -1,48 +1,102 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
+    <!-- App background gradient -->
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e0a3c"/>
-      <stop offset="100%" stop-color="#0f0a1e"/>
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="100%" stop-color="#0d0820"/>
     </linearGradient>
-    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#e9d5ff"/>
-      <stop offset="100%" stop-color="#a78bfa"/>
+
+    <!-- Bookmark gradient: violet to fuchsia -->
+    <linearGradient id="bmk" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#ec4899"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="18"/>
+
+    <!-- Heart gradient: pink to rose -->
+    <linearGradient id="hrt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fdf2f8"/>
+      <stop offset="100%" stop-color="#fbcfe8"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft drop shadow on bookmark -->
+    <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="14" flood-color="#a855f7" flood-opacity="0.5"/>
     </filter>
   </defs>
 
   <!-- Background rounded square -->
-  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
 
-  <!-- Subtle inner border glow -->
-  <rect width="512" height="512" rx="108" fill="none"
-        stroke="#7c3aed" stroke-width="1.5" stroke-opacity="0.3"/>
+  <!-- Subtle grid dots for texture -->
+  <circle cx="148" cy="148" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="256" cy="148" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="364" cy="148" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="148" cy="256" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="364" cy="256" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="148" cy="364" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="256" cy="364" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
+  <circle cx="364" cy="364" r="2.5" fill="#ffffff" fill-opacity="0.06"/>
 
-  <!-- Soft glow behind star -->
-  <ellipse cx="256" cy="256" rx="140" ry="140"
-           fill="url(#glow)" filter="url(#blur)"/>
+  <!-- Bookmark ribbon — centered, with V-notch at bottom -->
+  <!--
+    Top-left:  (172, 96)  rounded corner radius 18
+    Top-right: (340, 96)  rounded corner radius 18
+    Sides go down to y=420, then V-notch points at (256, 356)
+  -->
+  <path
+    d="M 190 96
+       L 322 96
+       Q 340 96 340 114
+       L 340 420
+       L 256 362
+       L 172 420
+       L 172 114
+       Q 172 96 190 96
+       Z"
+    fill="url(#bmk)"
+    filter="url(#shadow)"
+  />
 
-  <!-- 4-pointed sparkle star — main shape -->
-  <!-- Outer radius 152, inner radius 28 -->
-  <path d="
-    M 256 104
-    C 248 180 284 220 256 256
-    C 220 228 176 248 104 256
-    C 176 264 220 284 256 256
-    C 284 292 248 332 256 408
-    C 264 332 292 292 256 256
-    C 336 284 376 264 408 256
-    C 376 248 336 228 256 256
-    C 292 220 264 180 256 104
-    Z
-  " fill="url(#starGrad)"/>
+  <!-- Bookmark inner highlight strip (left edge shine) -->
+  <path
+    d="M 190 96
+       L 200 96
+       Q 190 96 190 106
+       L 190 370
+       L 182 376
+       L 172 382
+       L 172 114
+       Q 172 96 190 96
+       Z"
+    fill="#ffffff"
+    fill-opacity="0.15"
+  />
 
-  <!-- Small centre dot for depth -->
-  <circle cx="256" cy="256" r="14" fill="#f5f3ff" fill-opacity="0.9"/>
+  <!-- Heart shape inside bookmark (centered ~y=230) -->
+  <!-- Heart drawn as two cubic bezier arcs meeting at a point -->
+  <path
+    d="M 256 286
+       C 256 286 196 248 196 210
+       C 196 188 214 172 234 180
+       C 244 184 252 192 256 200
+       C 260 192 268 184 278 180
+       C 298 172 316 188 316 210
+       C 316 248 256 286 256 286
+       Z"
+    fill="url(#hrt)"
+    filter="url(#glow)"
+  />
+
+  <!-- Tiny star accent top-centre of bookmark -->
+  <circle cx="256" cy="130" r="7" fill="#ffffff" fill-opacity="0.5"/>
+  <circle cx="256" cy="130" r="3.5" fill="#ffffff" fill-opacity="0.9"/>
 </svg>
