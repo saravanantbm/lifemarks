@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0f0a1e;
+    color: #f3f4f6;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3b1f6e;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .card {
+    @apply glass rounded-2xl p-4;
+  }
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-500 active:bg-brand-700 text-white font-semibold rounded-xl px-5 py-3 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply bg-white/10 hover:bg-white/20 active:bg-white/5 text-white font-medium rounded-xl px-4 py-2 transition-colors duration-150;
+  }
+  .input {
+    @apply w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-400 transition-colors duration-150;
+  }
+  .textarea {
+    @apply input resize-none;
+  }
+  .star-btn {
+    @apply text-3xl transition-transform duration-100 active:scale-90 select-none cursor-pointer;
+  }
+}
