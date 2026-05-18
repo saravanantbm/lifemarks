@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import type { Goal, Experience, User, Milestone } from '../types';
 
 function uid(): string {
@@ -190,7 +191,7 @@ export const useStore = create<AppState>()(
   )
 );
 
-export const useActiveGoals = () => useStore((s) => s.goals.filter((g) => g.status === 'active'));
-export const useCompletedGoals = () => useStore((s) => s.goals.filter((g) => g.status === 'completed'));
-export const useWantExperiences = () => useStore((s) => s.experiences.filter((e) => e.status === 'want'));
-export const useDoneExperiences = () => useStore((s) => s.experiences.filter((e) => e.status === 'done'));
+export const useActiveGoals = () => useStore(useShallow((s) => s.goals.filter((g) => g.status === 'active')));
+export const useCompletedGoals = () => useStore(useShallow((s) => s.goals.filter((g) => g.status === 'completed')));
+export const useWantExperiences = () => useStore(useShallow((s) => s.experiences.filter((e) => e.status === 'want')));
+export const useDoneExperiences = () => useStore(useShallow((s) => s.experiences.filter((e) => e.status === 'done')));
