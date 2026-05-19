@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import type { Goal, Experience, User, Milestone } from '../types';
+import { supabase } from '../lib/supabase';
+import {
+  dbLoadGoals, dbInsertGoal, dbUpdateGoal, dbDeleteGoal,
+  dbLoadExperiences, dbInsertExperience, dbUpdateExperience, dbDeleteExperience,
+} from '../lib/db';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -13,11 +18,17 @@ interface AppState {
   experiences: Experience[];
   hasOnboarded: boolean;
   celebrationGoalId: string | null;
+  authLoading: boolean;
+  authError: string | null;
 
   // Auth
-  signIn: (name: string, email?: string) => void;
-  signOut: () => void;
+  initAuth: () => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<string | null>;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
+  updateProfileName: (name: string) => Promise<void>;
   completeOnboarding: () => void;
+  clearAuthError: () => void;
 
   // Goals
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'milestones' | 'status'>) => string;
@@ -43,81 +54,171 @@ interface AppState {
 
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       goals: [],
       experiences: [],
       hasOnboarded: false,
       celebrationGoalId: null,
+      authLoading: false,
+      authError: null,
 
-      signIn: (name, email) =>
+      // ── Auth ──────────────────────────────────────────────────────────────
+
+      initAuth: async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+        const [goals, experiences] = await Promise.all([
+          dbLoadGoals(session.user.id),
+          dbLoadExperiences(session.user.id),
+        ]);
         set({
-          user: { id: uid(), name, email, joinedAt: new Date().toISOString() },
+          user: {
+            id: session.user.id,
+            name: session.user.user_metadata?.name ?? session.user.email ?? 'User',
+            email: session.user.email,
+            joinedAt: session.user.created_at,
+          },
+          goals,
+          experiences,
           hasOnboarded: true,
-        }),
+        });
+      },
 
-      signOut: () => set({ user: null }),
+      signUp: async (name, email, password) => {
+        set({ authLoading: true, authError: null });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { name } },
+        });
+        if (error || !data.user) {
+          const msg = error?.message ?? 'Sign-up failed';
+          set({ authLoading: false, authError: msg });
+          return msg;
+        }
+        // Upload any locally created goals/experiences to cloud
+        const state = get();
+        await Promise.all([
+          ...state.goals.map((g) => dbInsertGoal(g, data.user!.id).catch(() => {})),
+          ...state.experiences.map((e) => dbInsertExperience(e, data.user!.id).catch(() => {})),
+        ]);
+        set({
+          user: { id: data.user.id, name, email, joinedAt: data.user.created_at },
+          hasOnboarded: true,
+          authLoading: false,
+        });
+        return null;
+      },
+
+      signIn: async (email, password) => {
+        set({ authLoading: true, authError: null });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error || !data.user) {
+          const msg = error?.message ?? 'Sign-in failed';
+          set({ authLoading: false, authError: msg });
+          return msg;
+        }
+        const [goals, experiences] = await Promise.all([
+          dbLoadGoals(data.user.id),
+          dbLoadExperiences(data.user.id),
+        ]);
+        set({
+          user: {
+            id: data.user.id,
+            name: data.user.user_metadata?.name ?? email,
+            email,
+            joinedAt: data.user.created_at,
+          },
+          goals,
+          experiences,
+          hasOnboarded: true,
+          authLoading: false,
+        });
+        return null;
+      },
+
+      signOut: async () => {
+        await supabase.auth.signOut();
+        set({ user: null, goals: [], experiences: [] });
+      },
+
+      updateProfileName: async (name) => {
+        await supabase.auth.updateUser({ data: { name } });
+        set((s) => ({ user: s.user ? { ...s.user, name } : null }));
+      },
 
       completeOnboarding: () => set({ hasOnboarded: true }),
+      clearAuthError: () => set({ authError: null }),
+
+      // ── Goals ─────────────────────────────────────────────────────────────
 
       addGoal: (goal) => {
         const id = uid();
-        set((s) => ({
-          goals: [
-            {
-              ...goal,
-              id,
-              milestones: [],
-              status: 'active',
-              createdAt: new Date().toISOString(),
-            },
-            ...s.goals,
-          ],
-        }));
+        const newGoal: Goal = {
+          ...goal,
+          id,
+          milestones: [],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ goals: [newGoal, ...s.goals] }));
+        const { user } = get();
+        if (user) dbInsertGoal(newGoal, user.id).catch(console.error);
         return id;
       },
 
-      updateGoal: (id, patch) =>
+      updateGoal: (id, patch) => {
         set((s) => ({
           goals: s.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
-        })),
+        }));
+        const { user } = get();
+        if (user) dbUpdateGoal(id, patch).catch(console.error);
+      },
 
-      deleteGoal: (id) =>
-        set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
+      deleteGoal: (id) => {
+        set((s) => ({ goals: s.goals.filter((g) => g.id !== id) }));
+        const { user } = get();
+        if (user) dbDeleteGoal(id).catch(console.error);
+      },
 
-      completeGoal: (id) =>
+      completeGoal: (id) => {
+        const completedAt = new Date().toISOString();
         set((s) => ({
           goals: s.goals.map((g) =>
-            g.id === id
-              ? { ...g, status: 'completed', completedAt: new Date().toISOString() }
-              : g
+            g.id === id ? { ...g, status: 'completed', completedAt } : g
           ),
           celebrationGoalId: id,
-        })),
+        }));
+        const { user } = get();
+        if (user) dbUpdateGoal(id, { status: 'completed', completedAt }).catch(console.error);
+      },
 
-      reopenGoal: (id) =>
+      reopenGoal: (id) => {
         set((s) => ({
           goals: s.goals.map((g) =>
             g.id === id ? { ...g, status: 'active', completedAt: undefined } : g
           ),
-        })),
+        }));
+        const { user } = get();
+        if (user) dbUpdateGoal(id, { status: 'active', completedAt: undefined }).catch(console.error);
+      },
 
-      addMilestone: (goalId, milestone) =>
+      // ── Milestones ────────────────────────────────────────────────────────
+
+      addMilestone: (goalId, milestone) => {
+        const newMilestone: Milestone = { ...milestone, id: uid(), completed: false };
         set((s) => ({
           goals: s.goals.map((g) =>
-            g.id === goalId
-              ? {
-                  ...g,
-                  milestones: [
-                    ...g.milestones,
-                    { ...milestone, id: uid(), completed: false },
-                  ],
-                }
-              : g
+            g.id === goalId ? { ...g, milestones: [...g.milestones, newMilestone] } : g
           ),
-        })),
+        }));
+        const goal = get().goals.find((g) => g.id === goalId);
+        const { user } = get();
+        if (user && goal) dbUpdateGoal(goalId, { milestones: goal.milestones }).catch(console.error);
+      },
 
-      toggleMilestone: (goalId, milestoneId) =>
+      toggleMilestone: (goalId, milestoneId) => {
         set((s) => ({
           goals: s.goals.map((g) =>
             g.id === goalId
@@ -125,57 +226,69 @@ export const useStore = create<AppState>()(
                   ...g,
                   milestones: g.milestones.map((m) =>
                     m.id === milestoneId
-                      ? {
-                          ...m,
-                          completed: !m.completed,
-                          completedAt: !m.completed ? new Date().toISOString() : undefined,
-                        }
+                      ? { ...m, completed: !m.completed, completedAt: !m.completed ? new Date().toISOString() : undefined }
                       : m
                   ),
                 }
               : g
           ),
-        })),
+        }));
+        const goal = get().goals.find((g) => g.id === goalId);
+        const { user } = get();
+        if (user && goal) dbUpdateGoal(goalId, { milestones: goal.milestones }).catch(console.error);
+      },
 
-      deleteMilestone: (goalId, milestoneId) =>
+      deleteMilestone: (goalId, milestoneId) => {
         set((s) => ({
           goals: s.goals.map((g) =>
             g.id === goalId
               ? { ...g, milestones: g.milestones.filter((m) => m.id !== milestoneId) }
               : g
           ),
-        })),
+        }));
+        const goal = get().goals.find((g) => g.id === goalId);
+        const { user } = get();
+        if (user && goal) dbUpdateGoal(goalId, { milestones: goal.milestones }).catch(console.error);
+      },
 
-      addExperience: (exp) =>
-        set((s) => ({
-          experiences: [
-            { ...exp, id: uid(), status: 'want', createdAt: new Date().toISOString() },
-            ...s.experiences,
-          ],
-        })),
+      // ── Experiences ───────────────────────────────────────────────────────
 
-      updateExperience: (id, patch) =>
+      addExperience: (exp) => {
+        const newExp: Experience = {
+          ...exp,
+          id: uid(),
+          status: 'want',
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ experiences: [newExp, ...s.experiences] }));
+        const { user } = get();
+        if (user) dbInsertExperience(newExp, user.id).catch(console.error);
+      },
+
+      updateExperience: (id, patch) => {
         set((s) => ({
           experiences: s.experiences.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        })),
+        }));
+        const { user } = get();
+        if (user) dbUpdateExperience(id, patch).catch(console.error);
+      },
 
-      deleteExperience: (id) =>
-        set((s) => ({ experiences: s.experiences.filter((e) => e.id !== id) })),
+      deleteExperience: (id) => {
+        set((s) => ({ experiences: s.experiences.filter((e) => e.id !== id) }));
+        const { user } = get();
+        if (user) dbDeleteExperience(id).catch(console.error);
+      },
 
-      markExperienceDone: (id, rating, review) =>
+      markExperienceDone: (id, rating, review) => {
+        const completedAt = new Date().toISOString();
         set((s) => ({
           experiences: s.experiences.map((e) =>
-            e.id === id
-              ? {
-                  ...e,
-                  status: 'done',
-                  completedAt: new Date().toISOString(),
-                  rating,
-                  review,
-                }
-              : e
+            e.id === id ? { ...e, status: 'done', completedAt, rating, review } : e
           ),
-        })),
+        }));
+        const { user } = get();
+        if (user) dbUpdateExperience(id, { status: 'done', completedAt, rating, review }).catch(console.error);
+      },
 
       setCelebration: (goalId) => set({ celebrationGoalId: goalId }),
     }),

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, MessageCircle, Shield, Info, LogOut, ChevronRight, Edit3, Check, X } from 'lucide-react';
+import {
+  User, MessageCircle, Shield, Info, LogOut,
+  ChevronRight, Edit3, Check, X, Eye, EyeOff, Loader2,
+} from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 export function Settings() {
@@ -9,11 +12,18 @@ export function Settings() {
   const experiences = useStore((s) => s.experiences);
   const signIn = useStore((s) => s.signIn);
   const signOut = useStore((s) => s.signOut);
+  const updateProfileName = useStore((s) => s.updateProfileName);
+  const authLoading = useStore((s) => s.authLoading);
+  const authError = useStore((s) => s.authError);
+  const clearAuthError = useStore((s) => s.clearAuthError);
+
   const [editName, setEditName] = useState(false);
-  const [nameValue, setNameValue] = useState(user?.name || '');
-  const [showSignIn, setShowSignIn] = useState(false);
+  const [nameValue, setNameValue] = useState(user?.name ?? '');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const stats = [
     { label: 'Total Goals', value: goals.length },
@@ -22,22 +32,32 @@ export function Settings() {
     { label: 'Done', value: experiences.filter((e) => e.status === 'done').length },
   ];
 
-  function handleSaveName() {
-    if (user && nameValue.trim()) {
-      signIn(nameValue.trim(), user.email);
+  async function handleSaveName() {
+    if (nameValue.trim()) {
+      await updateProfileName(nameValue.trim());
       setEditName(false);
     }
   }
 
-  function handleSignIn(e: React.FormEvent) {
+  async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
-    if (newName.trim()) {
-      signIn(newName.trim(), newEmail.trim() || undefined);
-      setShowSignIn(false);
+    clearAuthError();
+    if (authMode === 'signin') {
+      await signIn(email.trim(), password);
     }
   }
 
-  const whatsappUrl = 'https://wa.me/919944674648?text=' + encodeURIComponent('Hi! I\'m using Lifemarks and I\'d like to report a bug / request a feature:\n\n');
+  function openAuth(mode: 'signin' | 'signup') {
+    clearAuthError();
+    setEmail('');
+    setPassword('');
+    setNewName('');
+    setAuthMode(mode);
+  }
+
+  const whatsappUrl =
+    'https://wa.me/919944674648?text=' +
+    encodeURIComponent("Hi! I'm using Lifemarks and I'd like to report a bug / request a feature:\n\n");
 
   const sections = [
     {
@@ -117,10 +137,10 @@ export function Settings() {
                   </div>
                 )}
                 {user.email && <p className="text-white/40 text-sm">{user.email}</p>}
+                <p className="text-emerald-400 text-xs mt-0.5">✓ Synced to cloud</p>
               </div>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-4 gap-2">
               {stats.map(({ label, value }) => (
                 <div key={label} className="text-center">
@@ -131,38 +151,98 @@ export function Settings() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-2xl mx-auto mb-3">
-              <User size={28} className="text-white/40" />
+          <div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mx-0">
+                <User size={28} className="text-white/40" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">Exploring anonymously</p>
+                <p className="text-white/40 text-xs mt-0.5">Data is only on this device</p>
+              </div>
             </div>
-            <p className="text-white font-semibold">You're exploring anonymously</p>
-            <p className="text-white/40 text-sm mt-1 mb-4">Sign in to sync your data across devices</p>
-            {showSignIn ? (
-              <form onSubmit={handleSignIn} className="space-y-3 text-left">
-                <input
-                  className="input text-sm"
-                  placeholder="Your name *"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                  autoFocus
-                />
+
+            {authMode === null ? (
+              <div className="flex gap-2">
+                <button onClick={() => openAuth('signin')} className="flex-1 btn-primary py-2 text-sm">
+                  Sign In
+                </button>
+                <button onClick={() => openAuth('signup')} className="flex-1 btn-ghost py-2 text-sm border border-brand-500/30">
+                  Create Account
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleAuth} className="space-y-3">
+                <p className="text-white/60 text-sm font-medium">
+                  {authMode === 'signin' ? 'Sign in to your account' : 'Create your account'}
+                </p>
+                {authMode === 'signup' && (
+                  <input
+                    className="input text-sm"
+                    placeholder="Your name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                )}
                 <input
                   className="input text-sm"
                   type="email"
-                  placeholder="Email (optional)"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus={authMode === 'signin'}
                 />
-                <div className="flex gap-2">
-                  <button type="submit" className="flex-1 btn-primary py-2 text-sm">Sign In</button>
-                  <button type="button" onClick={() => setShowSignIn(false)} className="btn-ghost py-2 text-sm">Cancel</button>
+                <div className="relative">
+                  <input
+                    className="input text-sm pr-10"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
+
+                {authError && (
+                  <p className="text-red-400 text-xs">{authError}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="flex-1 btn-primary py-2 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    {authLoading ? <Loader2 size={15} className="animate-spin" /> : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode(null); clearAuthError(); }}
+                    className="btn-ghost py-2 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openAuth(authMode === 'signin' ? 'signup' : 'signin')}
+                  className="w-full text-center text-white/30 text-xs hover:text-white/50 transition-colors"
+                >
+                  {authMode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                </button>
               </form>
-            ) : (
-              <button onClick={() => setShowSignIn(true)} className="btn-primary">
-                Sign In / Create Account
-              </button>
             )}
           </div>
         )}
@@ -176,7 +256,7 @@ export function Settings() {
             {section.items.map((item) => (
               <button
                 key={item.label}
-                onClick={item.action || undefined}
+                onClick={item.action ?? undefined}
                 disabled={!item.action}
                 className="w-full flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-white/5 transition-colors text-left disabled:cursor-default"
               >
@@ -192,10 +272,9 @@ export function Settings() {
         </div>
       ))}
 
-      {/* Sign out */}
       {user && (
         <button
-          onClick={signOut}
+          onClick={() => signOut()}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-500/40 text-sm font-medium transition-all mt-2"
         >
           <LogOut size={16} /> Sign Out

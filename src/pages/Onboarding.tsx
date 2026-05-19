@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 const slides = [
@@ -23,27 +24,41 @@ const slides = [
 export function Onboarding() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const completeOnboarding = useStore((s) => s.completeOnboarding);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+
+  const signUp = useStore((s) => s.signUp);
   const signIn = useStore((s) => s.signIn);
-
-  function handleExplore() {
-    completeOnboarding();
-  }
-
-  function handleSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (name.trim()) {
-      signIn(name.trim());
-    } else {
-      completeOnboarding();
-    }
-  }
+  const completeOnboarding = useStore((s) => s.completeOnboarding);
+  const authLoading = useStore((s) => s.authLoading);
+  const authError = useStore((s) => s.authError);
+  const clearAuthError = useStore((s) => s.clearAuthError);
 
   const isLast = step === slides.length - 1;
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    clearAuthError();
+    if (mode === 'signup') {
+      await signUp(name.trim(), email.trim(), password);
+    } else {
+      await signIn(email.trim(), password);
+    }
+  }
+
+  function handleSkip() {
+    completeOnboarding();
+  }
+
+  function switchMode() {
+    clearAuthError();
+    setMode((m) => (m === 'signup' ? 'signin' : 'signup'));
+  }
+
   return (
     <div className="min-h-dvh flex flex-col bg-[#0f0a1e] relative overflow-hidden">
-      {/* Background glow */}
       <div className="absolute inset-0 bg-gradient-to-br from-brand-900/30 via-transparent to-purple-900/20 pointer-events-none" />
       <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-brand-700/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-pink-700/10 blur-3xl pointer-events-none" />
@@ -94,23 +109,82 @@ export function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-xs space-y-3"
           >
-            <form onSubmit={handleSignIn} className="space-y-3">
+            <p className="text-center text-white/60 text-sm font-medium">
+              {mode === 'signup' ? 'Create your account' : 'Welcome back'}
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === 'signup' && (
+                <input
+                  className="input text-sm"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              )}
               <input
-                className="input text-base"
-                placeholder="Your name (optional)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                className="input text-sm"
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus={mode === 'signin'}
               />
-              <button type="submit" className="btn-primary w-full py-3.5 text-base">
-                {name.trim() ? "Let's go, " + name.trim().split(' ')[0] + '! 🚀' : 'Start Exploring ✦'}
+              <div className="relative">
+                <input
+                  className="input text-sm pr-10"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {authError && (
+                <p className="text-red-400 text-xs text-center px-1">{authError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-primary w-full py-3.5 text-base flex items-center justify-center gap-2"
+              >
+                {authLoading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : mode === 'signup' ? (
+                  name.trim() ? `Let's go, ${name.trim().split(' ')[0]}! 🚀` : 'Create Account ✦'
+                ) : (
+                  'Sign In →'
+                )}
               </button>
             </form>
+
             <button
               type="button"
-              onClick={handleExplore}
-              className="w-full text-center text-white/40 text-sm py-2 hover:text-white/60 transition-colors"
+              onClick={switchMode}
+              className="w-full text-center text-white/40 text-sm py-1 hover:text-white/60 transition-colors"
             >
-              Skip for now
+              {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create account'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="w-full text-center text-white/25 text-xs py-1 hover:text-white/40 transition-colors"
+            >
+              Skip for now (data stays on this device)
             </button>
           </motion.div>
         ) : (

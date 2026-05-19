@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { Layout } from './components/Layout';
@@ -34,6 +35,12 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const initAuth = useStore((s) => s.initAuth);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
+
   return (
     <BrowserRouter>
       <AppRoutes />
