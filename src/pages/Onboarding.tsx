@@ -23,15 +23,14 @@ const slides = [
 
 export function Onboarding() {
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
 
   const signUp = useStore((s) => s.signUp);
   const signIn = useStore((s) => s.signIn);
-  const completeOnboarding = useStore((s) => s.completeOnboarding);
   const authLoading = useStore((s) => s.authLoading);
   const authError = useStore((s) => s.authError);
   const clearAuthError = useStore((s) => s.clearAuthError);
@@ -46,10 +45,6 @@ export function Onboarding() {
     } else {
       await signIn(email.trim(), password);
     }
-  }
-
-  function handleSkip() {
-    completeOnboarding();
   }
 
   function switchMode() {
@@ -94,7 +89,7 @@ export function Onboarding() {
           {slides.map((_, i) => (
             <button
               key={i}
-              onClick={() => setStep(i)}
+              onClick={() => !isLast && setStep(i)}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === step ? 'bg-brand-400 w-6' : 'bg-white/20 w-1.5'
               }`}
@@ -109,11 +104,11 @@ export function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-xs space-y-3"
           >
-            <p className="text-center text-white/60 text-sm font-medium">
-              {mode === 'signup' ? 'Create your account' : 'Welcome back'}
-            </p>
-
             <form onSubmit={handleSubmit} className="space-y-3">
+              <p className="text-center text-white/50 text-sm">
+                {mode === 'signup' ? 'Create your account to get started' : 'Welcome back'}
+              </p>
+
               {mode === 'signup' && (
                 <input
                   className="input text-sm"
@@ -124,6 +119,7 @@ export function Onboarding() {
                   autoFocus
                 />
               )}
+
               <input
                 className="input text-sm"
                 type="email"
@@ -133,11 +129,12 @@ export function Onboarding() {
                 required
                 autoFocus={mode === 'signin'}
               />
+
               <div className="relative">
                 <input
                   className="input text-sm pr-10"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Password"
+                  placeholder="Password (min 6 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -153,7 +150,7 @@ export function Onboarding() {
               </div>
 
               {authError && (
-                <p className="text-red-400 text-xs text-center px-1">{authError}</p>
+                <p className="text-red-400 text-xs text-center">{authError}</p>
               )}
 
               <button
@@ -176,15 +173,9 @@ export function Onboarding() {
               onClick={switchMode}
               className="w-full text-center text-white/40 text-sm py-1 hover:text-white/60 transition-colors"
             >
-              {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create account'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSkip}
-              className="w-full text-center text-white/25 text-xs py-1 hover:text-white/40 transition-colors"
-            >
-              Skip for now (data stays on this device)
+              {mode === 'signup'
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up"}
             </button>
           </motion.div>
         ) : (

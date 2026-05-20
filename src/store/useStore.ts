@@ -20,6 +20,7 @@ interface AppState {
   celebrationGoalId: string | null;
   authLoading: boolean;
   authError: string | null;
+  authInitialized: boolean;
 
   // Auth
   initAuth: () => Promise<void>;
@@ -62,27 +63,30 @@ export const useStore = create<AppState>()(
       celebrationGoalId: null,
       authLoading: false,
       authError: null,
+      authInitialized: false,
 
       // ── Auth ──────────────────────────────────────────────────────────────
 
       initAuth: async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return;
-        const [goals, experiences] = await Promise.all([
-          dbLoadGoals(session.user.id),
-          dbLoadExperiences(session.user.id),
-        ]);
-        set({
-          user: {
-            id: session.user.id,
-            name: session.user.user_metadata?.name ?? session.user.email ?? 'User',
-            email: session.user.email,
-            joinedAt: session.user.created_at,
-          },
-          goals,
-          experiences,
-          hasOnboarded: true,
-        });
+        if (session?.user) {
+          const [goals, experiences] = await Promise.all([
+            dbLoadGoals(session.user.id),
+            dbLoadExperiences(session.user.id),
+          ]);
+          set({
+            user: {
+              id: session.user.id,
+              name: session.user.user_metadata?.name ?? session.user.email ?? 'User',
+              email: session.user.email,
+              joinedAt: session.user.created_at,
+            },
+            goals,
+            experiences,
+            hasOnboarded: true,
+          });
+        }
+        set({ authInitialized: true });
       },
 
       signUp: async (name, email, password) => {
@@ -100,6 +104,7 @@ export const useStore = create<AppState>()(
         // Upload any locally created goals/experiences to cloud
         const state = get();
         await Promise.all([
+          supabase.from('profiles').upsert({ id: data.user!.id, name, email }),
           ...state.goals.map((g) => dbInsertGoal(g, data.user!.id).catch(() => {})),
           ...state.experiences.map((e) => dbInsertExperience(e, data.user!.id).catch(() => {})),
         ]);
