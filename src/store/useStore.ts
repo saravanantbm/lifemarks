@@ -7,6 +7,7 @@ import {
   dbLoadGoals, dbInsertGoal, dbUpdateGoal, dbDeleteGoal,
   dbLoadExperiences, dbInsertExperience, dbUpdateExperience, dbDeleteExperience,
 } from '../lib/db';
+import { identifyUser, track, resetAnalytics } from '../lib/analytics';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -108,8 +109,11 @@ export const useStore = create<AppState>()(
           ...state.goals.map((g) => dbInsertGoal(g, data.user!.id).catch(() => {})),
           ...state.experiences.map((e) => dbInsertExperience(e, data.user!.id).catch(() => {})),
         ]);
+        const userId = data.user.id;
+        identifyUser(userId, { name, email });
+        track('Signed Up');
         set({
-          user: { id: data.user.id, name, email, joinedAt: data.user.created_at },
+          user: { id: userId, name, email, joinedAt: data.user.created_at },
           hasOnboarded: true,
           authLoading: false,
         });
@@ -128,13 +132,11 @@ export const useStore = create<AppState>()(
           dbLoadGoals(data.user.id),
           dbLoadExperiences(data.user.id),
         ]);
+        const name = data.user.user_metadata?.name ?? email;
+        identifyUser(data.user.id, { name, email });
+        track('Signed In');
         set({
-          user: {
-            id: data.user.id,
-            name: data.user.user_metadata?.name ?? email,
-            email,
-            joinedAt: data.user.created_at,
-          },
+          user: { id: data.user.id, name, email, joinedAt: data.user.created_at },
           goals,
           experiences,
           hasOnboarded: true,
@@ -144,6 +146,8 @@ export const useStore = create<AppState>()(
       },
 
       signOut: async () => {
+        track('Signed Out');
+        resetAnalytics();
         await supabase.auth.signOut();
         set({ user: null, goals: [], experiences: [] });
       },
@@ -168,6 +172,7 @@ export const useStore = create<AppState>()(
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ goals: [newGoal, ...s.goals] }));
+        track('Goal Created', { category: goal.category, priority: goal.priority });
         const { user } = get();
         if (user) dbInsertGoal(newGoal, user.id).catch(console.error);
         return id;
@@ -189,12 +194,14 @@ export const useStore = create<AppState>()(
 
       completeGoal: (id) => {
         const completedAt = new Date().toISOString();
+        const goal = get().goals.find((g) => g.id === id);
         set((s) => ({
           goals: s.goals.map((g) =>
             g.id === id ? { ...g, status: 'completed', completedAt } : g
           ),
           celebrationGoalId: id,
         }));
+        track('Goal Completed', { category: goal?.category, priority: goal?.priority });
         const { user } = get();
         if (user) dbUpdateGoal(id, { status: 'completed', completedAt }).catch(console.error);
       },
@@ -224,6 +231,7 @@ export const useStore = create<AppState>()(
       },
 
       toggleMilestone: (goalId, milestoneId) => {
+        const before = get().goals.find((g) => g.id === goalId)?.milestones.find((m) => m.id === milestoneId);
         set((s) => ({
           goals: s.goals.map((g) =>
             g.id === goalId
@@ -238,6 +246,7 @@ export const useStore = create<AppState>()(
               : g
           ),
         }));
+        if (!before?.completed) track('Milestone Completed');
         const goal = get().goals.find((g) => g.id === goalId);
         const { user } = get();
         if (user && goal) dbUpdateGoal(goalId, { milestones: goal.milestones }).catch(console.error);
@@ -266,6 +275,7 @@ export const useStore = create<AppState>()(
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ experiences: [newExp, ...s.experiences] }));
+        track('Experience Added', { type: exp.type });
         const { user } = get();
         if (user) dbInsertExperience(newExp, user.id).catch(console.error);
       },
@@ -286,11 +296,13 @@ export const useStore = create<AppState>()(
 
       markExperienceDone: (id, rating, review) => {
         const completedAt = new Date().toISOString();
+        const exp = get().experiences.find((e) => e.id === id);
         set((s) => ({
           experiences: s.experiences.map((e) =>
             e.id === id ? { ...e, status: 'done', completedAt, rating, review } : e
           ),
         }));
+        track('Experience Marked Done', { type: exp?.type, rating });
         const { user } = get();
         if (user) dbUpdateExperience(id, { status: 'done', completedAt, rating, review }).catch(console.error);
       },

@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useStore } from './store/useStore';
+import { initAnalytics, track } from './lib/analytics';
 import { setupPushNotifications } from './lib/notifications';
+
+initAnalytics();
 import { Layout } from './components/Layout';
 import { CelebrationOverlay } from './components/CelebrationOverlay';
 import { Onboarding } from './pages/Onboarding';
@@ -21,6 +26,14 @@ function Splash() {
       </div>
     </div>
   );
+}
+
+function PageTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    track('Page Viewed', { path: location.pathname });
+  }, [location.pathname]);
+  return null;
 }
 
 function AppRoutes() {
@@ -64,7 +77,10 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PageTracker />
       <AppRoutes />
+      <Analytics />
+      <SpeedInsights />
     </BrowserRouter>
   );
 }
