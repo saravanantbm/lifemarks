@@ -71,17 +71,15 @@ export const useStore = create<AppState>()(
       initAuth: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          const u = session.user;
+          const name = u.user_metadata?.name ?? u.email ?? 'User';
           const [goals, experiences] = await Promise.all([
-            dbLoadGoals(session.user.id),
-            dbLoadExperiences(session.user.id),
+            dbLoadGoals(u.id),
+            dbLoadExperiences(u.id),
           ]);
+          identifyUser(u.id, { name, email: u.email });
           set({
-            user: {
-              id: session.user.id,
-              name: session.user.user_metadata?.name ?? session.user.email ?? 'User',
-              email: session.user.email,
-              joinedAt: session.user.created_at,
-            },
+            user: { id: u.id, name, email: u.email, joinedAt: u.created_at },
             goals,
             experiences,
             hasOnboarded: true,

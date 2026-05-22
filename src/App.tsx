@@ -5,8 +5,6 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useStore } from './store/useStore';
 import { initAnalytics, track } from './lib/analytics';
 import { setupPushNotifications } from './lib/notifications';
-
-initAnalytics();
 import { Layout } from './components/Layout';
 import { CelebrationOverlay } from './components/CelebrationOverlay';
 import { Onboarding } from './pages/Onboarding';
@@ -16,6 +14,8 @@ import { GoalDetail } from './pages/GoalDetail';
 import { Experiences } from './pages/Experiences';
 import { LivedIt } from './pages/LivedIt';
 import { Settings } from './pages/Settings';
+
+initAnalytics();
 
 function Splash() {
   return (
