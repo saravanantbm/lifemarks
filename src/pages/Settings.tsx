@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   User, MessageCircle, Shield, Info, LogOut,
-  ChevronRight, Edit3, Check, X, Eye, EyeOff, Loader2,
+  ChevronRight, Edit3, Check, X, Eye, EyeOff, Loader2, Music2, Link2Off,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import {
+  initiateSpotifyAuth, isSpotifyConnected, disconnectSpotify, fetchAllLikedSongs,
+  type SpotifyTrack,
+} from '../lib/spotify';
+
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined;
 
 export function Settings() {
+  const location = useLocation();
   const user = useStore((s) => s.user);
   const goals = useStore((s) => s.goals);
   const experiences = useStore((s) => s.experiences);
+  const addExperience = useStore((s) => s.addExperience);
   const signIn = useStore((s) => s.signIn);
   const signOut = useStore((s) => s.signOut);
   const updateProfileName = useStore((s) => s.updateProfileName);
@@ -24,6 +33,66 @@ export function Settings() {
   const [password, setPassword] = useState('');
   const [newName, setNewName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Spotify state
+  const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyConnected);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ fetched: number; total: number } | null>(null);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.state?.spotifyConnected) {
+      setSpotifyConnected(true);
+      window.history.replaceState({}, '', location.pathname);
+    }
+  }, [location]);
+
+  async function handleSpotifyImport() {
+    setImporting(true);
+    setImportProgress(null);
+    setImportResult(null);
+    setImportError(null);
+    try {
+      const tracks = await fetchAllLikedSongs((fetched, total) =>
+        setImportProgress({ fetched, total })
+      );
+      const existingTitles = new Set(
+        experiences.filter((e) => e.type === 'Music').map((e) => e.title.toLowerCase())
+      );
+      const toImport: SpotifyTrack[] = tracks.filter(
+        (t) => !existingTitles.has(`${t.title} — ${t.artist}`.toLowerCase())
+      );
+      for (const t of toImport) {
+        addExperience({
+          title: `${t.title} — ${t.artist}`,
+          type: 'Music',
+          notes: t.album,
+          link: t.spotifyUrl,
+        });
+      }
+      setImportResult(
+        toImport.length > 0
+          ? `Imported ${toImport.length} song${toImport.length !== 1 ? 's' : ''}${tracks.length - toImport.length > 0 ? ` (${tracks.length - toImport.length} already in library)` : ''}`
+          : 'All songs already in your library'
+      );
+    } catch (e) {
+      setImportError((e as Error).message);
+      if ((e as Error).message.includes('expired') || (e as Error).message.includes('reconnect')) {
+        setSpotifyConnected(false);
+      }
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
+  }
+
+  function handleDisconnectSpotify() {
+    disconnectSpotify();
+    setSpotifyConnected(false);
+    setImportResult(null);
+    setImportError(null);
+  }
 
   const stats = [
     { label: 'Total Goals', value: goals.length },
@@ -247,6 +316,73 @@ export function Settings() {
           </div>
         )}
       </motion.div>
+
+      {/* Spotify */}
+      {SPOTIFY_CLIENT_ID && (
+        <div className="mb-4">
+          <p className="text-xs text-white/30 uppercase tracking-widest mb-2 px-1">Integrations</p>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card space-y-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#1DB954]/20 flex items-center justify-center flex-shrink-0">
+                <Music2 size={18} className="text-[#1DB954]" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">Spotify</p>
+                <p className="text-white/40 text-xs">
+                  {spotifyConnected ? 'Connected — import your liked songs' : 'Connect to import your liked songs'}
+                </p>
+              </div>
+              {spotifyConnected ? (
+                <button
+                  onClick={handleDisconnectSpotify}
+                  className="flex items-center gap-1 text-white/30 hover:text-red-400 text-xs transition-colors"
+                >
+                  <Link2Off size={13} /> Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={initiateSpotifyAuth}
+                  className="px-3 py-1.5 rounded-lg bg-[#1DB954] text-black text-xs font-bold hover:bg-[#1ed760] transition-colors"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+
+            {spotifyConnected && (
+              <div className="space-y-2">
+                <button
+                  onClick={handleSpotifyImport}
+                  disabled={importing}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1DB954]/10 border border-[#1DB954]/20 text-[#1DB954] text-sm font-medium hover:bg-[#1DB954]/20 transition-colors disabled:opacity-60"
+                >
+                  {importing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      {importProgress
+                        ? `Fetching ${importProgress.fetched} / ${importProgress.total}…`
+                        : 'Fetching liked songs…'}
+                    </>
+                  ) : (
+                    'Import Liked Songs'
+                  )}
+                </button>
+
+                {importResult && (
+                  <p className="text-center text-emerald-400 text-xs">{importResult}</p>
+                )}
+                {importError && (
+                  <p className="text-center text-red-400 text-xs">{importError}</p>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
 
       {/* Settings sections */}
       {sections.map((section) => (

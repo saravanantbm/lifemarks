@@ -14,6 +14,7 @@ import { GoalDetail } from './pages/GoalDetail';
 import { Experiences } from './pages/Experiences';
 import { LivedIt } from './pages/LivedIt';
 import { Settings } from './pages/Settings';
+import { SpotifyCallback } from './pages/SpotifyCallback';
 
 initAnalytics();
 
@@ -53,6 +54,7 @@ function AppRoutes() {
   return (
     <>
       <Routes>
+        <Route path="/spotify/callback" element={<SpotifyCallback />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/goals" element={<Goals />} />
